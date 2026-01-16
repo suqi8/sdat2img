@@ -1,0 +1,57 @@
+name: Build sdat2img Go (Universal)
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build All Platforms
+        run: |
+          echo "🔨 Building for Windows (x64)..."
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o sdat2img.exe sdat2img.go
+          
+          echo "🔨 Building for Linux (x64)..."
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o sdat2img_linux sdat2img.go
+          
+          echo "🔨 Building for Android (ARM64)..."
+          GOOS=android GOARCH=arm64 go build -ldflags="-s -w" -o sdat2img_android sdat2img.go
+
+          echo "🔨 Building for macOS (Intel)..."
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o sdat2img_mac_amd64 sdat2img.go
+          
+          echo "🔨 Building for macOS (Apple Silicon)..."
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o sdat2img_mac_arm64 sdat2img.go
+
+      - name: Merge macOS Universal Binary
+        run: |
+          echo "🔀 Merging macOS binaries with lipo..."
+          # 合并 Intel 和 M1 版本
+          lipo -create sdat2img_mac_amd64 sdat2img_mac_arm64 -output sdat2img_mac
+          
+          # 赋予执行权限
+          chmod +x sdat2img_mac
+          
+          # 验证文件类型 (日志里会显示 Universal binary)
+          file sdat2img_mac
+          
+          # 清理掉不再需要的单架构文件
+          rm sdat2img_mac_amd64 sdat2img_mac_arm64
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdat2img-binaries
+          path: |
+            sdat2img.exe
+            sdat2img_linux
+            sdat2img_android
+            sdat2img_mac
